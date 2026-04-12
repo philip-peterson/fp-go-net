@@ -53,7 +53,13 @@ func Serve(handler Handler) func(net.Listener) IOE.IOEither[NetError, Void] {
 }
 
 var myHandler Handler = func(c net.Conn) IOE.IOEither[NetError, Void] {
-	return IOE.Of[NetError](VOID)
+	response := []byte("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nHello World")
+	return F.Pipe1(
+		Write(response)(c),
+		IOE.Chain(func(_ int) IOE.IOEither[NetError, Void] {
+			return Close(c)
+		}),
+	)
 }
 
 func main() {

@@ -23,9 +23,16 @@ var myHandler fpnet.Handler = func(c net.Conn) IOE.IOEither[fpnet.NetError, Void
 }
 
 func main() {
+	port := ":8080"
 
-	result := F.Pipe1(
-		fpnet.Listen("tcp", ":8080"),
+	result := F.Pipe2(
+		fpnet.Listen("tcp", port),
+		IOE.ChainFirst(func(l net.Listener) IOE.IOEither[fpnet.NetError, net.Listener] {
+			return IOE.FromIO[fpnet.NetError](func() net.Listener {
+				fmt.Println("listening on", port)
+				return l
+			})
+		}),
 		IOE.Chain(fpnet.Serve(myHandler)),
 	)()
 
@@ -34,6 +41,8 @@ func main() {
 			fmt.Println("fatal:", err)
 			return VOID
 		},
-		func(_ Void) Void { return VOID },
+		func(_ Void) Void {
+			return VOID
+		},
 	)(result)
 }

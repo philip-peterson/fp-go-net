@@ -1,12 +1,10 @@
-package main
+package fpgonet
 
 import (
-	"fmt"
 	"net"
 
 	E "github.com/IBM/fp-go/v2/either"
 	. "github.com/IBM/fp-go/v2/function"
-	F "github.com/IBM/fp-go/v2/function"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 )
 
@@ -50,30 +48,4 @@ func Serve(handler Handler) func(net.Listener) IOE.IOEither[NetError, Void] {
 			return E.Right[NetError](VOID)
 		}
 	}
-}
-
-var myHandler Handler = func(c net.Conn) IOE.IOEither[NetError, Void] {
-	response := []byte("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nHello World")
-	return F.Pipe1(
-		Write(response)(c),
-		IOE.Chain(func(_ int) IOE.IOEither[NetError, Void] {
-			return Close(c)
-		}),
-	)
-}
-
-func main() {
-
-	result := F.Pipe1(
-		Listen("tcp", ":8080"),
-		IOE.Chain(Serve(myHandler)),
-	)()
-
-	E.Fold(
-		func(err NetError) Void {
-			fmt.Println("fatal:", err)
-			return VOID
-		},
-		func(_ Void) Void { return VOID },
-	)(result)
 }

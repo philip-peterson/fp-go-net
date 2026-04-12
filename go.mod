@@ -1,4 +1,4 @@
-module philippeterson.com/fp-go-io/mod
+module github.com/philip-peterson/fp-go-net
 
 go 1.26
 

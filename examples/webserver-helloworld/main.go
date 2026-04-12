@@ -6,7 +6,6 @@ import (
 
 	E "github.com/IBM/fp-go/v2/either"
 	. "github.com/IBM/fp-go/v2/function"
-	F "github.com/IBM/fp-go/v2/function"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 
 	fpnet "github.com/philip-peterson/fp-go-net"
@@ -14,7 +13,7 @@ import (
 
 var myHandler fpnet.Handler = func(c net.Conn) IOE.IOEither[fpnet.NetError, Void] {
 	response := []byte("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nHello World")
-	return F.Pipe1(
+	return Pipe1(
 		fpnet.Write(response)(c),
 		IOE.Chain(func(_ int) IOE.IOEither[fpnet.NetError, Void] {
 			return fpnet.Close(c)
@@ -25,7 +24,7 @@ var myHandler fpnet.Handler = func(c net.Conn) IOE.IOEither[fpnet.NetError, Void
 func main() {
 	port := ":8080"
 
-	result := F.Pipe2(
+	result := Pipe2(
 		fpnet.Listen("tcp", port),
 		IOE.ChainFirst(func(l net.Listener) IOE.IOEither[fpnet.NetError, net.Listener] {
 			return IOE.FromIO[fpnet.NetError](func() net.Listener {

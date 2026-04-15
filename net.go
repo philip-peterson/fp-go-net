@@ -1,6 +1,7 @@
 package fpgonet
 
 import (
+	"bufio"
 	"io"
 	"net"
 
@@ -41,6 +42,17 @@ func Read(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
 			func(err error) NetError { return NetError{OpNameRead, err} },
 		)
 	}
+}
+
+func ReadLine(c net.Conn) IOE.IOEither[NetError, []byte] {
+	return ReadLineFrom(bufio.NewReader(c))
+}
+
+func ReadLineFrom(r *bufio.Reader) IOE.IOEither[NetError, []byte] {
+	return IOE.TryCatch(
+		func() ([]byte, error) { return r.ReadBytes('\n') },
+		func(err error) NetError { return NetError{OpNameReadLine, err} },
+	)
 }
 
 func Write(b []byte) func(net.Conn) IOE.IOEither[NetError, int] {

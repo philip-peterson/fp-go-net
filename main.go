@@ -17,6 +17,7 @@ const (
 	OpNameAccept   = "accept"
 	OpNameListen   = "listen"
 	OpNameRead     = "read"
+	OpNameReadLine = "readLine"
 	OpNameWrite    = "write"
 	OpNameReadFull = "readFull"
 	OpNameClose    = "close"

@@ -62,11 +62,11 @@ func ircHandler(state *ServerState) fpnet.Handler {
 			log.Printf("new connection from %s", c.RemoteAddr())
 			r := bufio.NewReader(c)
 			for {
-				stop := false
+				done := false
 				E.Fold(
 					func(err fpnet.NetError) Void {
 						log.Printf("connection closed from %s: %v", c.RemoteAddr(), err)
-						stop = true
+						done = true
 						return VOID
 					},
 					func(b []byte) Void {
@@ -77,14 +77,21 @@ func ircHandler(state *ServerState) fpnet.Handler {
 							},
 							func(msg IRCMessage) Void {
 								log.Printf("recv from %s: %s %v", c.RemoteAddr(), msg.Command, msg.Params)
-								dispatch(state, c, msg)()
+								E.Fold(
+									func(err fpnet.NetError) Void {
+										log.Printf("dispatch error from %s: %v", c.RemoteAddr(), err)
+										done = true
+										return VOID
+									},
+									func(_ Void) Void { return VOID },
+								)(dispatch(state, c, msg)())
 								return VOID
 							},
 						)(ParseMessage(b))
 						return VOID
 					},
 				)(fpnet.ReadLineFrom(r)())
-				if stop {
+				if done {
 					break
 				}
 			}
@@ -149,7 +156,9 @@ func sendWelcome(c net.Conn, nick Nick) IOE.IOEither[fpnet.NetError, Void] {
 	return func() E.Either[fpnet.NetError, Void] {
 		for _, m := range numerics {
 			log.Printf("sending %s to %s", m.Command, nick)
-			c.Write(EncodeMessage(m))
+			if result := writeVoid(c, EncodeMessage(m))(); E.IsLeft(result) {
+				return result
+			}
 		}
 		return E.Right[fpnet.NetError](VOID)
 	}
@@ -202,7 +211,9 @@ func handlePrivmsg(state *ServerState, c net.Conn, msg IRCMessage) IOE.IOEither[
 		}
 		state.mu.RUnlock()
 		for _, conn := range recipients {
-			fpnet.Write(outMsg)(conn)()
+			if result := fpnet.Write(outMsg)(conn)(); E.IsLeft(result) {
+				log.Printf("write error broadcasting to %s", conn.RemoteAddr())
+			}
 		}
 		return E.Right[fpnet.NetError](VOID)
 	}

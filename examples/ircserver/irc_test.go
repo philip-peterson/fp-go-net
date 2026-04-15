@@ -1,50 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"net"
 	"testing"
-	"time"
 
 	E "github.com/IBM/fp-go/v2/either"
-	. "github.com/IBM/fp-go/v2/function"
 
 	fpnet "github.com/philip-peterson/fp-go-net"
+	fpnettest "github.com/philip-peterson/fp-go-net/testing"
 )
-
-// mockConn implements net.Conn, capturing writes in a buffer.
-type mockConn struct {
-	buf    bytes.Buffer
-	closed bool
-}
-
-func (m *mockConn) Write(b []byte) (int, error)        { return m.buf.Write(b) }
-func (m *mockConn) Read(b []byte) (int, error)         { return 0, nil }
-func (m *mockConn) Close() error                       { m.closed = true; return nil }
-func (m *mockConn) LocalAddr() net.Addr                { return &net.TCPAddr{} }
-func (m *mockConn) RemoteAddr() net.Addr               { return &net.TCPAddr{} }
-func (m *mockConn) SetDeadline(t time.Time) error      { return nil }
-func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
-func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
-
-func (m *mockConn) written() string { return m.buf.String() }
-
-// mustRight fails the test if the Either is a Left.
-func mustRight[A any](t *testing.T, result E.Either[fpnet.NetError, A]) A {
-	t.Helper()
-	var val A
-	E.Fold(
-		func(err fpnet.NetError) Void {
-			t.Fatalf("expected Right, got Left: %v", err)
-			return VOID
-		},
-		func(a A) Void {
-			val = a
-			return VOID
-		},
-	)(result)
-	return val
-}
 
 func newState() *ServerState {
 	return &ServerState{
@@ -57,7 +21,7 @@ func newState() *ServerState {
 // --- ParseMessage ---
 
 func TestParseMessage_Basic(t *testing.T) {
-	msg := mustRight(t, ParseMessage([]byte("PING :token\r\n")))
+	msg := fpnettest.AssertRight(t, ParseMessage([]byte("PING :token\r\n")))
 	if msg.Command != "PING" {
 		t.Errorf("command = %q, want PING", msg.Command)
 	}
@@ -67,7 +31,7 @@ func TestParseMessage_Basic(t *testing.T) {
 }
 
 func TestParseMessage_WithPrefix(t *testing.T) {
-	msg := mustRight(t, ParseMessage([]byte(":nick!user@host PRIVMSG #chan :hello world\r\n")))
+	msg := fpnettest.AssertRight(t, ParseMessage([]byte(":nick!user@host PRIVMSG #chan :hello world\r\n")))
 	if msg.Prefix != "nick!user@host" {
 		t.Errorf("prefix = %q, want nick!user@host", msg.Prefix)
 	}
@@ -106,77 +70,69 @@ func TestEncodeMessage_WithPrefix(t *testing.T) {
 // --- handlePing ---
 
 func TestHandlePing(t *testing.T) {
-	conn := &mockConn{}
-	mustRight(t, handlePing(conn, IRCMessage{Command: "PING", Params: []string{"token123"}})())
+	conn := &fpnettest.MockConn{}
+	fpnettest.AssertRight(t, handlePing(conn, IRCMessage{Command: "PING", Params: []string{"token123"}})())
 	want := "PONG token123\r\n"
-	if conn.written() != want {
-		t.Errorf("got %q, want %q", conn.written(), want)
+	if conn.Written() != want {
+		t.Errorf("got %q, want %q", conn.Written(), want)
 	}
 }
 
 // --- registration ---
 
 func TestRegistration_NickThenUser(t *testing.T) {
-	conn := &mockConn{}
+	conn := &fpnettest.MockConn{}
 	state := newState()
 
-	mustRight(t, handleNick(state, conn, IRCMessage{Params: []string{"alice"}})())
-	if conn.written() != "" {
-		t.Errorf("expected no output before USER, got %q", conn.written())
+	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"alice"}})())
+	if conn.Written() != "" {
+		t.Errorf("expected no output before USER, got %q", conn.Written())
 	}
 
-	mustRight(t, handleUser(state, conn)())
-	out := conn.written()
-	if out == "" {
-		t.Fatal("expected welcome sequence, got nothing")
+	fpnettest.AssertRight(t, handleUser(state, conn)())
+	if conn.Written() == "" {
+		t.Error("expected welcome sequence, got nothing")
 	}
-	firstLine := out[:len(":server 001 alice Welcome to the IRC server alice\r\n")]
-	if E.IsLeft(ParseMessage([]byte(firstLine))) {
-		t.Fatal("could not parse first response line")
-	}
+	fpnettest.AssertRight(t, ParseMessage([]byte(":server 001 alice Welcome to the IRC server alice\r\n")))
 }
 
 func TestRegistration_UserThenNick(t *testing.T) {
-	conn := &mockConn{}
+	conn := &fpnettest.MockConn{}
 	state := newState()
 
-	mustRight(t, handleUser(state, conn)())
-	if conn.written() != "" {
-		t.Errorf("expected no output before NICK, got %q", conn.written())
+	fpnettest.AssertRight(t, handleUser(state, conn)())
+	if conn.Written() != "" {
+		t.Errorf("expected no output before NICK, got %q", conn.Written())
 	}
 
-	mustRight(t, handleNick(state, conn, IRCMessage{Params: []string{"bob"}})())
-	if conn.written() == "" {
+	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"bob"}})())
+	if conn.Written() == "" {
 		t.Error("expected welcome sequence after NICK, got nothing")
 	}
 }
 
 func TestHandleNick_NoParams(t *testing.T) {
-	conn := &mockConn{}
-	result := handleNick(newState(), conn, IRCMessage{Params: []string{}})()
-	if !E.IsLeft(result) {
+	conn := &fpnettest.MockConn{}
+	if !E.IsLeft(handleNick(newState(), conn, IRCMessage{Params: []string{}})()) {
 		t.Error("expected Left for missing nick param")
 	}
 }
 
 func TestUnknownCommand(t *testing.T) {
-	conn := &mockConn{}
-	mustRight(t, dispatch(newState(), conn, IRCMessage{Command: "FOOBAR"})())
-	if conn.written() == "" {
-		t.Error("expected 421 response, got nothing")
-	}
-	msg := mustRight(t, ParseMessage([]byte(conn.written())))
+	conn := &fpnettest.MockConn{}
+	fpnettest.AssertRight(t, dispatch(newState(), conn, IRCMessage{Command: "FOOBAR"})())
+	msg := fpnettest.AssertRight(t, ParseMessage([]byte(conn.Written())))
 	if msg.Command != "421" {
 		t.Errorf("command = %q, want 421", msg.Command)
 	}
 }
 
 func TestCleanup_RemovesClientFromState(t *testing.T) {
-	conn := &mockConn{}
+	conn := &fpnettest.MockConn{}
 	state := newState()
 
-	mustRight(t, handleNick(state, conn, IRCMessage{Params: []string{"carol"}})())
-	mustRight(t, handleUser(state, conn)())
+	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"carol"}})())
+	fpnettest.AssertRight(t, handleUser(state, conn)())
 
 	state.cleanup(conn)
 
@@ -189,3 +145,7 @@ func TestCleanup_RemovesClientFromState(t *testing.T) {
 		t.Errorf("expected userSet to be empty after cleanup, got %v", state.userSet)
 	}
 }
+
+// ensure MockConn satisfies net.Conn at compile time
+var _ net.Conn = (*fpnettest.MockConn)(nil)
+var _ = fpnet.NetError{}

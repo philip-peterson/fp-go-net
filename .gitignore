@@ -1,1 +1,3 @@
 mod
+examples/ircserver/ircserver
+.claude

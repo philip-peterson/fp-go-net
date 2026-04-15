@@ -5,17 +5,14 @@ import (
 	"testing"
 
 	E "github.com/IBM/fp-go/v2/either"
+	"github.com/IBM/fp-go/v2/ioref"
 
 	fpnet "github.com/philip-peterson/fp-go-net"
 	fpnettest "github.com/philip-peterson/fp-go-net/testing"
 )
 
-func newState() *ServerState {
-	return &ServerState{
-		clients:  make(map[Nick]net.Conn),
-		channels: make(map[Channel][]Nick),
-		userSet:  make(map[net.Conn]bool),
-	}
+func newState() ioref.IORef[ServerState] {
+	return ioref.MakeIORef(newServerState())()
 }
 
 // --- ParseMessage ---
@@ -82,14 +79,14 @@ func TestHandlePing(t *testing.T) {
 
 func TestRegistration_NickThenUser(t *testing.T) {
 	conn := &fpnettest.MockConn{}
-	state := newState()
+	ref := newState()
 
-	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"alice"}})())
+	fpnettest.AssertRight(t, handleNick(ref, conn, IRCMessage{Params: []string{"alice"}})())
 	if conn.Written() != "" {
 		t.Errorf("expected no output before USER, got %q", conn.Written())
 	}
 
-	fpnettest.AssertRight(t, handleUser(state, conn)())
+	fpnettest.AssertRight(t, handleUser(ref, conn)())
 	if conn.Written() == "" {
 		t.Error("expected welcome sequence, got nothing")
 	}
@@ -98,14 +95,14 @@ func TestRegistration_NickThenUser(t *testing.T) {
 
 func TestRegistration_UserThenNick(t *testing.T) {
 	conn := &fpnettest.MockConn{}
-	state := newState()
+	ref := newState()
 
-	fpnettest.AssertRight(t, handleUser(state, conn)())
+	fpnettest.AssertRight(t, handleUser(ref, conn)())
 	if conn.Written() != "" {
 		t.Errorf("expected no output before NICK, got %q", conn.Written())
 	}
 
-	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"bob"}})())
+	fpnettest.AssertRight(t, handleNick(ref, conn, IRCMessage{Params: []string{"bob"}})())
 	if conn.Written() == "" {
 		t.Error("expected welcome sequence after NICK, got nothing")
 	}
@@ -129,20 +126,19 @@ func TestUnknownCommand(t *testing.T) {
 
 func TestCleanup_RemovesClientFromState(t *testing.T) {
 	conn := &fpnettest.MockConn{}
-	state := newState()
+	ref := newState()
 
-	fpnettest.AssertRight(t, handleNick(state, conn, IRCMessage{Params: []string{"carol"}})())
-	fpnettest.AssertRight(t, handleUser(state, conn)())
+	fpnettest.AssertRight(t, handleNick(ref, conn, IRCMessage{Params: []string{"carol"}})())
+	fpnettest.AssertRight(t, handleUser(ref, conn)())
 
-	state.cleanup(conn)
+	cleanup(ref, conn)
 
-	state.mu.RLock()
-	defer state.mu.RUnlock()
-	if len(state.clients) != 0 {
-		t.Errorf("expected clients to be empty after cleanup, got %v", state.clients)
+	s := ioref.Read(ref)()
+	if len(s.clients) != 0 {
+		t.Errorf("expected clients to be empty after cleanup, got %v", s.clients)
 	}
-	if len(state.userSet) != 0 {
-		t.Errorf("expected userSet to be empty after cleanup, got %v", state.userSet)
+	if len(s.userSet) != 0 {
+		t.Errorf("expected userSet to be empty after cleanup, got %v", s.userSet)
 	}
 }
 

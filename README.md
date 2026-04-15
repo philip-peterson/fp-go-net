@@ -15,3 +15,8 @@ Several examples are provided:
 
 * [Simple HTTP server](https://github.com/philip-peterson/fp-go-net/blob/main/examples/webserver-helloworld/main.go)
 * [IRC Server](https://github.com/philip-peterson/fp-go-net/blob/main/examples/ircserver/main.go)
+
+Attribution
+---
+
+This library was largely developed with Claude. However, it is released under the MIT license because portions are handwritten and in the spirit of reserving no rights.

@@ -13,16 +13,6 @@ type NetError struct {
 	Err error
 }
 
-const (
-	OpNameAccept   = "accept"
-	OpNameListen   = "listen"
-	OpNameRead     = "read"
-	OpNameReadLine = "readLine"
-	OpNameWrite    = "write"
-	OpNameReadFull = "readFull"
-	OpNameClose    = "close"
-)
-
 func (e NetError) Error() string { return e.Op + ": " + e.Err.Error() }
 
 type Handler func(net.Conn) IOE.IOEither[NetError, Void]
@@ -33,7 +23,7 @@ func Serve(handler Handler) func(net.Listener) IOE.IOEither[NetError, Void] {
 			for {
 				done := false
 				E.Fold(
-					func(err NetError) Void {
+					func(NetError) Void {
 						done = true
 						return VOID
 					},

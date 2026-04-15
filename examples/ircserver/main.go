@@ -31,6 +31,31 @@ type ServerState struct {
 	mu       sync.RWMutex
 }
 
+func (s *ServerState) cleanup(c net.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.userSet, c)
+	for nick, conn := range s.clients {
+		if conn == c {
+			delete(s.clients, nick)
+			for ch, members := range s.channels {
+				s.channels[ch] = removeNick(members, nick)
+			}
+			break
+		}
+	}
+}
+
+func removeNick(members []Nick, target Nick) []Nick {
+	out := members[:0]
+	for _, n := range members {
+		if n != target {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 func ircHandler(state *ServerState) fpnet.Handler {
 	return func(c net.Conn) IOE.IOEither[fpnet.NetError, Void] {
 		return func() E.Either[fpnet.NetError, Void] {
@@ -63,9 +88,20 @@ func ircHandler(state *ServerState) fpnet.Handler {
 					break
 				}
 			}
+			state.cleanup(c)
 			return E.Right[fpnet.NetError](VOID)
 		}
 	}
+}
+
+// writeVoid writes a message to a connection and discards the byte count.
+func writeVoid(c net.Conn, msg []byte) IOE.IOEither[fpnet.NetError, Void] {
+	return Pipe1(
+		fpnet.Write(msg)(c),
+		IOE.Chain(func(_ int) IOE.IOEither[fpnet.NetError, Void] {
+			return IOE.Of[fpnet.NetError](VOID)
+		}),
+	)
 }
 
 func handleNick(state *ServerState, c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
@@ -112,9 +148,8 @@ func sendWelcome(c net.Conn, nick Nick) IOE.IOEither[fpnet.NetError, Void] {
 	}
 	return func() E.Either[fpnet.NetError, Void] {
 		for _, m := range numerics {
-			msg := EncodeMessage(m)
 			log.Printf("sending %s to %s", m.Command, nick)
-			c.Write(msg)
+			c.Write(EncodeMessage(m))
 		}
 		return E.Right[fpnet.NetError](VOID)
 	}
@@ -126,15 +161,7 @@ func handlePing(c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
 		token = msg.Params[0]
 	}
 	log.Printf("PING from %s, sending PONG %s", c.RemoteAddr(), token)
-	return Pipe1(
-		fpnet.Write(EncodeMessage(IRCMessage{
-			Command: "PONG",
-			Params:  []string{token},
-		}))(c),
-		IOE.Chain(func(_ int) IOE.IOEither[fpnet.NetError, Void] {
-			return IOE.Of[fpnet.NetError](VOID)
-		}),
-	)
+	return writeVoid(c, EncodeMessage(IRCMessage{Command: "PONG", Params: []string{token}}))
 }
 
 func handleJoin(state *ServerState, c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
@@ -167,15 +194,15 @@ func handlePrivmsg(state *ServerState, c net.Conn, msg IRCMessage) IOE.IOEither[
 			Params:  []string{string(ch), text},
 		})
 		state.mu.RLock()
-		members := state.channels[ch]
-		state.mu.RUnlock()
-		for _, member := range members {
-			state.mu.RLock()
-			conn, ok := state.clients[member]
-			state.mu.RUnlock()
-			if ok && conn != c {
-				fpnet.Write(outMsg)(conn)()
+		var recipients []net.Conn
+		for _, member := range state.channels[ch] {
+			if conn, ok := state.clients[member]; ok && conn != c {
+				recipients = append(recipients, conn)
 			}
+		}
+		state.mu.RUnlock()
+		for _, conn := range recipients {
+			fpnet.Write(outMsg)(conn)()
 		}
 		return E.Right[fpnet.NetError](VOID)
 	}
@@ -215,16 +242,7 @@ func dispatch(state *ServerState, c net.Conn, msg IRCMessage) IOE.IOEither[fpnet
 		return fpnet.Close(c)
 	default:
 		log.Printf("unknown command from %s: %s", c.RemoteAddr(), msg.Command)
-		return Pipe1(
-			fpnet.Write(EncodeMessage(
-				IRCMessage{
-					Command: "421",
-					Params:  []string{"Unknown command"},
-				}))(c),
-			IOE.Chain(func(_ int) IOE.IOEither[fpnet.NetError, Void] {
-				return IOE.Of[fpnet.NetError](VOID)
-			}),
-		)
+		return writeVoid(c, EncodeMessage(IRCMessage{Command: "421", Params: []string{"Unknown command"}}))
 	}
 }
 
@@ -252,7 +270,6 @@ func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 
 	msg := IRCMessage{}
 
-	// parse prefix
 	if strings.HasPrefix(line, ":") {
 		parts := strings.SplitN(line, " ", 2)
 		msg.Prefix = parts[0][1:]
@@ -262,7 +279,6 @@ func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 		line = parts[1]
 	}
 
-	// parse command and params
 	parts := strings.SplitN(line, " :", 2)
 	fields := strings.Fields(parts[0])
 	if len(fields) == 0 {
@@ -272,7 +288,6 @@ func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 	msg.Command = fields[0]
 	msg.Params = fields[1:]
 
-	// trailing param (after " :")
 	if len(parts) == 2 {
 		msg.Params = append(msg.Params, parts[1])
 	}
@@ -287,7 +302,6 @@ func EncodeMessage(m IRCMessage) []byte {
 	}
 	sb.WriteString(m.Command)
 	if len(m.Params) > 0 {
-		// last param gets the ":" prefix if it contains spaces
 		leading := m.Params[:len(m.Params)-1]
 		trailing := m.Params[len(m.Params)-1]
 		for _, p := range leading {

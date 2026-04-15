@@ -20,18 +20,18 @@ func listenInternal(
 ) IOE.IOEither[NetError, net.Listener] {
 	return IOE.TryCatch(
 		func() (net.Listener, error) { return listenFunc(network, addr) },
-		func(err error) NetError { return NetError{OpNameListen, err} },
+		func(err error) NetError { return NetError{"listen", err} },
 	)
 }
 
 func Accept(l net.Listener) IOE.IOEither[NetError, net.Conn] {
 	return IOE.TryCatch(
 		l.Accept,
-		func(err error) NetError { return NetError{OpNameAccept, err} },
+		func(err error) NetError { return NetError{"accept", err} },
 	)
 }
 
-func Read(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
+func Read(n int) func(net.Conn) IOE.IOEither[NetError, []byte] {
 	return func(c net.Conn) IOE.IOEither[NetError, []byte] {
 		return IOE.TryCatch(
 			func() ([]byte, error) {
@@ -39,7 +39,7 @@ func Read(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
 				count, err := c.Read(buf)
 				return buf[:count], err
 			},
-			func(err error) NetError { return NetError{OpNameRead, err} },
+			func(err error) NetError { return NetError{"read", err} },
 		)
 	}
 }
@@ -51,7 +51,7 @@ func ReadLine(c net.Conn) IOE.IOEither[NetError, []byte] {
 func ReadLineFrom(r *bufio.Reader) IOE.IOEither[NetError, []byte] {
 	return IOE.TryCatch(
 		func() ([]byte, error) { return r.ReadBytes('\n') },
-		func(err error) NetError { return NetError{OpNameReadLine, err} },
+		func(err error) NetError { return NetError{"readLine", err} },
 	)
 }
 
@@ -59,12 +59,12 @@ func Write(b []byte) func(net.Conn) IOE.IOEither[NetError, int] {
 	return func(c net.Conn) IOE.IOEither[NetError, int] {
 		return IOE.TryCatch(
 			func() (int, error) { return c.Write(b) },
-			func(err error) NetError { return NetError{OpNameWrite, err} },
+			func(err error) NetError { return NetError{"write", err} },
 		)
 	}
 }
 
-func ReadFull(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
+func ReadFull(n int) func(net.Conn) IOE.IOEither[NetError, []byte] {
 	return func(c net.Conn) IOE.IOEither[NetError, []byte] {
 		return IOE.TryCatch(
 			func() ([]byte, error) {
@@ -72,7 +72,7 @@ func ReadFull(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
 				_, err := io.ReadFull(c, buf)
 				return buf, err
 			},
-			func(err error) NetError { return NetError{OpNameReadFull, err} },
+			func(err error) NetError { return NetError{"readFull", err} },
 		)
 	}
 }
@@ -80,6 +80,6 @@ func ReadFull(n int) func(c net.Conn) IOE.IOEither[NetError, []byte] {
 func Close(c io.Closer) IOE.IOEither[NetError, Void] {
 	return IOE.TryCatch(
 		func() (struct{}, error) { return VOID, c.Close() },
-		func(err error) NetError { return NetError{OpNameClose, err} },
+		func(err error) NetError { return NetError{"close", err} },
 	)
 }

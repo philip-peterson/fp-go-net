@@ -5,7 +5,8 @@ In networking development, the problem frequently arises of testing your network
 suddenly something you have to worry about, among other things.
 
 But with [ibm/fp-go](https://github.com/IBM/fp-go) and monadic programming, we can abstract away the statefulness of our programs
-to test the logic alone, not the statefulness or networking aspects.
+to test the logic alone, not the statefulness or networking aspects. This lets us avoid complicated network spying and allows us
+to abstract our logic away from the statefulness.
 
 Examples
 ---

@@ -5,4 +5,4 @@ mod
 examples/ircserver/ircserver
 examples/udp-echo/udp-echo
 examples/webserver-helloworld/webserver-helloworld
-examples/jabber/jabber
+examples/xmpp/xmpp

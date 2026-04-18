@@ -9,6 +9,7 @@ import (
 
 	E "github.com/IBM/fp-go/v2/either"
 	. "github.com/IBM/fp-go/v2/function"
+	IO "github.com/IBM/fp-go/v2/io"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 	"github.com/IBM/fp-go/v2/ioref"
 	"github.com/IBM/fp-go/v2/pair"
@@ -281,12 +282,26 @@ func dispatch(ref ioref.IORef[ServerState], c net.Conn, msg IRCMessage) IOE.IOEi
 }
 
 func main() {
+	port := ":6667"
 	ref := ioref.MakeIORef(newServerState())()
 
-	log.Println("IRC server listening on :6667")
-	Pipe1(
-		fpnet.Listen("tcp", ":6667"),
+	Pipe3(
+		fpnet.Listen("tcp", port),
+		IOE.ChainFirst(func(l net.Listener) IOE.IOEither[fpnet.NetError, net.Listener] {
+			return IOE.FromIO[fpnet.NetError](func() net.Listener {
+				log.Println("IRC server listening on", port)
+				return l
+			})
+		}),
 		IOE.Chain(fpnet.Serve(ircHandler(ref))),
+		IOE.Fold(
+			func(err fpnet.NetError) IO.IO[Void] {
+				return func() Void { log.Fatal("fatal:", err); return VOID }
+			},
+			func(_ Void) IO.IO[Void] {
+				return func() Void { return VOID }
+			},
+		),
 	)()
 }
 

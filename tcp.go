@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	E "github.com/IBM/fp-go/v2/either"
 	. "github.com/IBM/fp-go/v2/function"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 )
@@ -82,4 +83,30 @@ func Close(c io.Closer) IOE.IOEither[NetError, Void] {
 		func() (struct{}, error) { return VOID, c.Close() },
 		func(err error) NetError { return NetError{"close", err} },
 	)
+}
+
+type Handler func(net.Conn) IOE.IOEither[NetError, Void]
+
+func Serve(handler Handler) func(net.Listener) IOE.IOEither[NetError, Void] {
+	return func(l net.Listener) IOE.IOEither[NetError, Void] {
+		return func() E.Either[NetError, Void] {
+			for {
+				done := false
+				E.Fold(
+					func(NetError) Void {
+						done = true
+						return VOID
+					},
+					func(conn net.Conn) Void {
+						go handler(conn)()
+						return VOID
+					},
+				)(Accept(l)())
+				if done {
+					break
+				}
+			}
+			return E.Right[NetError](VOID)
+		}
+	}
 }

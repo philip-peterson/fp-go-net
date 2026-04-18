@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	E "github.com/IBM/fp-go/v2/either"
 	. "github.com/IBM/fp-go/v2/function"
+	IO "github.com/IBM/fp-go/v2/io"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 
 	fpnet "github.com/philip-peterson/fp-go-net"
@@ -24,7 +24,7 @@ var myHandler fpnet.Handler = func(c net.Conn) IOE.IOEither[fpnet.NetError, Void
 func main() {
 	port := ":8080"
 
-	result := Pipe2(
+	Pipe3(
 		fpnet.Listen("tcp", port),
 		IOE.ChainFirst(func(l net.Listener) IOE.IOEither[fpnet.NetError, net.Listener] {
 			return IOE.FromIO[fpnet.NetError](func() net.Listener {
@@ -33,15 +33,13 @@ func main() {
 			})
 		}),
 		IOE.Chain(fpnet.Serve(myHandler)),
+		IOE.Fold(
+			func(err fpnet.NetError) IO.IO[Void] {
+				return func() Void { fmt.Println("fatal:", err); return VOID }
+			},
+			func(_ Void) IO.IO[Void] {
+				return func() Void { return VOID }
+			},
+		),
 	)()
-
-	E.Fold(
-		func(err fpnet.NetError) Void {
-			fmt.Println("fatal:", err)
-			return VOID
-		},
-		func(_ Void) Void {
-			return VOID
-		},
-	)(result)
 }

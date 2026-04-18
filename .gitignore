@@ -6,3 +6,5 @@ examples/ircserver/ircserver
 examples/udp-echo/udp-echo
 examples/webserver-helloworld/webserver-helloworld
 examples/xmpp/xmpp
+examples/xmpp/cert.pem
+examples/xmpp/key.pem

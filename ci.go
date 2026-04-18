@@ -36,3 +36,16 @@ func (r *Repo) TestIRC(ctx context.Context) error {
 
 	return err
 }
+
+func (r *Repo) CI(ctx context.Context) error {
+	if err := r.BuildNet(ctx); err != nil {
+		return err
+	}
+	if err := r.BuildTLS(ctx); err != nil {
+		return err
+	}
+	if err := r.TestIRC(ctx); err != nil {
+		return err
+	}
+	return nil
+}

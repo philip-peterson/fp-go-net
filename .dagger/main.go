@@ -12,23 +12,23 @@ func (r *FpGoNet) Ci(ctx context.Context,
 	// +defaultPath="."
 	src *dagger.Directory,
 ) error {
-	if err := r.buildNet(ctx, src); err != nil {
+	if err := r.BuildNet(ctx, src); err != nil {
 		return err
 	}
-	if err := r.buildTLS(ctx, src); err != nil {
+	if err := r.BuildTLS(ctx, src); err != nil {
 		return err
 	}
-	if err := r.testIRC(ctx, src); err != nil {
+	if err := r.TestIRC(ctx, src); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *FpGoNet) buildNet(ctx context.Context, src *dagger.Directory) error {
+func (r *FpGoNet) BuildNet(ctx context.Context, src *dagger.Directory) error {
 	return r.build(ctx, src, "fp-go-net")
 }
 
-func (r *FpGoNet) buildTLS(ctx context.Context, src *dagger.Directory) error {
+func (r *FpGoNet) BuildTLS(ctx context.Context, src *dagger.Directory) error {
 	return r.build(ctx, src, "fp-go-net-tls")
 }
 
@@ -44,7 +44,7 @@ func (r *FpGoNet) build(ctx context.Context, src *dagger.Directory, path string)
 	return err
 }
 
-func (r *FpGoNet) testIRC(ctx context.Context, src *dagger.Directory) error {
+func (r *FpGoNet) TestIRC(ctx context.Context, src *dagger.Directory) error {
 	_, err := baseContainer.
 		WithDirectory("/repo", src).
 		WithWorkdir("/repo/examples/ircserver").

@@ -32,9 +32,10 @@ func (r *FpGoNet) buildTLS(ctx context.Context, src *dagger.Directory) error {
 	return r.build(ctx, src, "fp-go-net-tls")
 }
 
+var baseContainer = dag.Container().From("golang:1.26")
+
 func (r *FpGoNet) build(ctx context.Context, src *dagger.Directory, path string) error {
-	_, err := dag.Container().
-		From("golang:1.22").
+	_, err := baseContainer.
 		WithDirectory("/repo", src).
 		WithWorkdir("/repo/" + path).
 		WithExec([]string{"go", "build", "./..."}).
@@ -44,8 +45,7 @@ func (r *FpGoNet) build(ctx context.Context, src *dagger.Directory, path string)
 }
 
 func (r *FpGoNet) testIRC(ctx context.Context, src *dagger.Directory) error {
-	_, err := dag.Container().
-		From("golang:1.22").
+	_, err := baseContainer.
 		WithDirectory("/repo", src).
 		WithWorkdir("/repo/examples/ircserver").
 		WithExec([]string{"go", "test", "./..."}).

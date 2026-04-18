@@ -21,14 +21,21 @@ func listenInternal(
 ) IOE.IOEither[NetError, net.Listener] {
 	return IOE.TryCatch(
 		func() (net.Listener, error) { return listenFunc(network, addr) },
-		func(err error) NetError { return NetError{"listen", err} },
+		wrapErr(OpNameListen),
 	)
 }
 
 func Accept(l net.Listener) IOE.IOEither[NetError, net.Conn] {
 	return IOE.TryCatch(
 		l.Accept,
-		func(err error) NetError { return NetError{"accept", err} },
+		wrapErr(OpNameAccept),
+	)
+}
+
+func Dial(network, addr string) IOE.IOEither[NetError, net.Conn] {
+	return IOE.TryCatch(
+		func() (net.Conn, error) { return net.Dial(network, addr) },
+		wrapErr(OpNameDial),
 	)
 }
 
@@ -40,7 +47,7 @@ func Read(n int) func(net.Conn) IOE.IOEither[NetError, []byte] {
 				count, err := c.Read(buf)
 				return buf[:count], err
 			},
-			func(err error) NetError { return NetError{"read", err} },
+			wrapErr(OpNameRead),
 		)
 	}
 }
@@ -52,7 +59,7 @@ func ReadLine(c net.Conn) IOE.IOEither[NetError, []byte] {
 func ReadLineFrom(r *bufio.Reader) IOE.IOEither[NetError, []byte] {
 	return IOE.TryCatch(
 		func() ([]byte, error) { return r.ReadBytes('\n') },
-		func(err error) NetError { return NetError{"readLine", err} },
+		wrapErr(OpNameReadLine),
 	)
 }
 
@@ -60,7 +67,7 @@ func Write(b []byte) func(net.Conn) IOE.IOEither[NetError, int] {
 	return func(c net.Conn) IOE.IOEither[NetError, int] {
 		return IOE.TryCatch(
 			func() (int, error) { return c.Write(b) },
-			func(err error) NetError { return NetError{"write", err} },
+			wrapErr(OpNameWrite),
 		)
 	}
 }
@@ -73,7 +80,7 @@ func ReadFull(n int) func(net.Conn) IOE.IOEither[NetError, []byte] {
 				_, err := io.ReadFull(c, buf)
 				return buf, err
 			},
-			func(err error) NetError { return NetError{"readFull", err} },
+			wrapErr(OpNameReadFull),
 		)
 	}
 }
@@ -81,7 +88,7 @@ func ReadFull(n int) func(net.Conn) IOE.IOEither[NetError, []byte] {
 func Close(c io.Closer) IOE.IOEither[NetError, Void] {
 	return IOE.TryCatch(
 		func() (struct{}, error) { return VOID, c.Close() },
-		func(err error) NetError { return NetError{"close", err} },
+		wrapErr(OpNameClose),
 	)
 }
 

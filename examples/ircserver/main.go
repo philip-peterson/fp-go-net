@@ -17,6 +17,13 @@ import (
 	fpnet "github.com/philip-peterson/fp-go-net"
 )
 
+const (
+	opNick    = "nick"
+	opJoin    = "join"
+	opPrivmsg = "privmsg"
+	opParse   = "parse"
+)
+
 type Nick string
 type Channel string
 
@@ -125,7 +132,7 @@ func writeVoid(c net.Conn, msg []byte) IOE.IOEither[fpnet.NetError, Void] {
 
 func handleNick(ref ioref.IORef[ServerState], c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
 	if len(msg.Params) == 0 {
-		return IOE.Left[Void](fpnet.NetError{Op: "nick", Err: errors.New("no nickname given")})
+		return IOE.Left[Void](fpnet.NetError{Op: opNick, Err: errors.New("no nickname given")})
 	}
 	nick := Nick(msg.Params[0])
 	return Pipe1(
@@ -191,7 +198,7 @@ func handlePing(c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
 
 func handleJoin(ref ioref.IORef[ServerState], c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
 	if len(msg.Params) == 0 {
-		return IOE.Left[Void](fpnet.NetError{Op: "join", Err: errors.New("no channel given")})
+		return IOE.Left[Void](fpnet.NetError{Op: opJoin, Err: errors.New("no channel given")})
 	}
 	ch := Channel(msg.Params[0])
 	return Pipe1(
@@ -209,7 +216,7 @@ func handleJoin(ref ioref.IORef[ServerState], c net.Conn, msg IRCMessage) IOE.IO
 
 func handlePrivmsg(ref ioref.IORef[ServerState], c net.Conn, msg IRCMessage) IOE.IOEither[fpnet.NetError, Void] {
 	if len(msg.Params) < 2 {
-		return IOE.Left[Void](fpnet.NetError{Op: "privmsg", Err: errors.New("no target or message")})
+		return IOE.Left[Void](fpnet.NetError{Op: opPrivmsg, Err: errors.New("no target or message")})
 	}
 	ch := Channel(msg.Params[0])
 	text := msg.Params[1]
@@ -310,7 +317,7 @@ func main() {
 func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 	line := strings.TrimRight(string(b), "\r\n")
 	if len(line) == 0 {
-		return E.Left[IRCMessage](fpnet.NetError{Op: "parse", Err: errors.New("empty message")})
+		return E.Left[IRCMessage](fpnet.NetError{Op: opParse, Err: errors.New("empty message")})
 	}
 
 	msg := IRCMessage{}
@@ -319,7 +326,7 @@ func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 		parts := strings.SplitN(line, " ", 2)
 		msg.Prefix = parts[0][1:]
 		if len(parts) < 2 {
-			return E.Left[IRCMessage](fpnet.NetError{Op: "parse", Err: errors.New("no command")})
+			return E.Left[IRCMessage](fpnet.NetError{Op: opParse, Err: errors.New("no command")})
 		}
 		line = parts[1]
 	}
@@ -327,7 +334,7 @@ func ParseMessage(b []byte) E.Either[fpnet.NetError, IRCMessage] {
 	parts := strings.SplitN(line, " :", 2)
 	fields := strings.Fields(parts[0])
 	if len(fields) == 0 {
-		return E.Left[IRCMessage](fpnet.NetError{Op: "parse", Err: errors.New("no command")})
+		return E.Left[IRCMessage](fpnet.NetError{Op: opParse, Err: errors.New("no command")})
 	}
 
 	msg.Command = fields[0]

@@ -13,5 +13,4 @@ jobs:
       - uses: dagger/dagger-for-github@v7
         with:
           version: 0.20.6
-      - name: Run CI
-        run: dagger call ci
+          call: ci

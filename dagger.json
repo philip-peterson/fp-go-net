@@ -1,0 +1,15 @@
+{
+  "name": "fp-go-net",
+  "engineVersion": "v0.20.6",
+  "sdk": {
+    "source": "go"
+  },
+  "toolchains": [
+    {
+      "name": "go",
+      "source": "github.com/dagger/dagger/toolchains/go@main",
+      "pin": "6e6a18036e4ed31f0488c697ecebc667971cfe3f"
+    }
+  ],
+  "source": ".dagger"
+}

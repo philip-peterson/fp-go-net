@@ -1,37 +1,55 @@
-// A generated module for FpGoNet functions
-//
-// This module has been generated via dagger init and serves as a reference to
-// basic module structure as you get started with Dagger.
-//
-// Two functions have been pre-created. You can modify, delete, or add to them,
-// as needed. They demonstrate usage of arguments and return types using simple
-// echo and grep commands. The functions can be called from the dagger CLI or
-// from one of the SDKs.
-//
-// The first line in this comment block is a short description line and the
-// rest is a long description with more detail on the module's purpose or usage,
-// if appropriate. All modules should have a short description.
-
 package main
 
 import (
 	"context"
+
 	"dagger/fp-go-net/internal/dagger"
 )
 
 type FpGoNet struct{}
 
-// Returns a container that echoes whatever string argument is provided
-func (m *FpGoNet) ContainerEcho(stringArg string) *dagger.Container {
-	return dag.Container().From("alpine:latest").WithExec([]string{"echo", stringArg})
+func (r *FpGoNet) Ci(ctx context.Context,
+	// +defaultPath="."
+	src *dagger.Directory,
+) error {
+	if err := r.buildNet(ctx, src); err != nil {
+		return err
+	}
+	if err := r.buildTLS(ctx, src); err != nil {
+		return err
+	}
+	if err := r.testIRC(ctx, src); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Returns lines that match a pattern in the files of the provided Directory
-func (m *FpGoNet) GrepDir(ctx context.Context, directoryArg *dagger.Directory, pattern string) (string, error) {
-	return dag.Container().
-		From("alpine:latest").
-		WithMountedDirectory("/mnt", directoryArg).
-		WithWorkdir("/mnt").
-		WithExec([]string{"grep", "-R", pattern, "."}).
-		Stdout(ctx)
+func (r *FpGoNet) buildNet(ctx context.Context, src *dagger.Directory) error {
+	return r.build(ctx, src, "fp-go-net")
+}
+
+func (r *FpGoNet) buildTLS(ctx context.Context, src *dagger.Directory) error {
+	return r.build(ctx, src, "fp-go-net-tls")
+}
+
+func (r *FpGoNet) build(ctx context.Context, src *dagger.Directory, path string) error {
+	_, err := dag.Container().
+		From("golang:1.22").
+		WithDirectory("/repo", src).
+		WithWorkdir("/repo/" + path).
+		WithExec([]string{"go", "build", "./..."}).
+		Sync(ctx)
+
+	return err
+}
+
+func (r *FpGoNet) testIRC(ctx context.Context, src *dagger.Directory) error {
+	_, err := dag.Container().
+		From("golang:1.22").
+		WithDirectory("/repo", src).
+		WithWorkdir("/repo/examples/ircserver").
+		WithExec([]string{"go", "test", "./..."}).
+		Sync(ctx)
+
+	return err
 }

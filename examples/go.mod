@@ -9,6 +9,6 @@ require (
 )
 
 replace (
-	github.com/philip-peterson/fp-go-net => ../fp-go-net
+	github.com/philip-peterson/fp-go-net => ..
 	github.com/philip-peterson/fp-go-net-tls => ../fp-go-net-tls
 )

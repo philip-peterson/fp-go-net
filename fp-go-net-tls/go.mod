@@ -7,4 +7,4 @@ require (
 	github.com/philip-peterson/fp-go-net v1.4.0
 )
 
-replace github.com/philip-peterson/fp-go-net => ../fp-go-net
+replace github.com/philip-peterson/fp-go-net => ..

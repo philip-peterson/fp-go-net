@@ -26,7 +26,7 @@ func (r *FpGoNet) Ci(ctx context.Context,
 }
 
 func (r *FpGoNet) BuildNet(ctx context.Context, src *dagger.Directory) error {
-	return r.build(ctx, src, "fp-go-net")
+	return r.build(ctx, src, ".")
 }
 
 func (r *FpGoNet) BuildTLS(ctx context.Context, src *dagger.Directory) error {

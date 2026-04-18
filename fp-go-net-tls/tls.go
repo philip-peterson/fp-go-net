@@ -1,3 +1,6 @@
+// Package fpgonettls provides functional-programming-style TLS wrappers built
+// on top of fp-go-net, enabling TLS upgrade of net.Conn connections as
+// composable IOEither values.
 package fpgonettls
 
 import (
@@ -6,11 +9,6 @@ import (
 
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 	fpgonet "github.com/philip-peterson/fp-go-net"
-)
-
-const (
-	OpNameTLSServer = "tls-server"
-	OpNameTLSClient = "tls-client"
 )
 
 func wrapErr(op string) func(error) fpgonet.NetError {

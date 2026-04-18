@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// MockConn implements net.Conn, capturing writes in an in-memory buffer.
-// Reads always return immediately with no data. Useful for testing handlers
-// without any real network connections.
+// MockConn implements net.Conn for testing TCP stream primitives.
+// Writes are captured in an in-memory buffer; reads return immediately with no data.
 type MockConn struct {
 	buf    bytes.Buffer
+	// Closed is true after Close has been called.
 	Closed bool
 }
 

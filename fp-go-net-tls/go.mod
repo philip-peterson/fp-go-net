@@ -1,4 +1,4 @@
-module github.com/philip-peterson/fp-go-net-tls
+module github.com/philip-peterson/fp-go-net/fp-go-net-tls
 
 go 1.26
 

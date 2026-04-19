@@ -18,7 +18,7 @@ import (
 	"github.com/IBM/fp-go/v2/pair"
 
 	fpnet "github.com/philip-peterson/fp-go-net"
-	fpnettls "github.com/philip-peterson/fp-go-net-tls"
+	fpnettls "github.com/philip-peterson/fp-go-net/fp-go-net-tls"
 )
 
 const domain = "localhost"

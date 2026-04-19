@@ -52,12 +52,14 @@ func (r *FpGoNet) BumpMinor(ctx context.Context,
 	token *dagger.Secret,
 ) (string, error) {
 	script := strings.Join([]string{
-		`LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")`,
+		`LATEST=$(git tag --list 'v*' --sort=-v:refname | grep -v '/' | head -1)`,
+		`LATEST=${LATEST:-v0.0.0}`,
 		`MAJOR=$(echo "$LATEST" | sed 's/v\([0-9]*\)\..*/\1/')`,
 		`MINOR=$(echo "$LATEST" | sed 's/v[0-9]*\.\([0-9]*\)\..*/\1/')`,
 		`NEW_TAG="v${MAJOR}.$((MINOR + 1)).0"`,
+		`TLS_TAG="fp-go-net-tls/${NEW_TAG}"`,
 		`sed -i "s|github.com/philip-peterson/fp-go-net v[0-9.]*|github.com/philip-peterson/fp-go-net ${NEW_TAG}|g" fp-go-net-tls/go.mod examples/go.mod`,
-		`sed -i "s|github.com/philip-peterson/fp-go-net-tls v[0-9.]*|github.com/philip-peterson/fp-go-net-tls ${NEW_TAG}|g" examples/go.mod`,
+		`sed -i "s|github.com/philip-peterson/fp-go-net/fp-go-net-tls v[0-9.]*|github.com/philip-peterson/fp-go-net/fp-go-net-tls ${NEW_TAG}|g" examples/go.mod`,
 		`REMOTE=$(git remote get-url origin)`,
 		// convert git@github.com:owner/repo.git → https://owner/repo.git
 		`HTTPS=$(echo "$REMOTE" | sed 's|git@github.com:|https://github.com/|')`,
@@ -68,7 +70,8 @@ func (r *FpGoNet) BumpMinor(ctx context.Context,
 		`git commit -m "chore: release ${NEW_TAG}"`,
 		`BRANCH=$(git rev-parse --abbrev-ref HEAD)`,
 		`git tag "$NEW_TAG"`,
-		`git push "$AUTH_URL" "HEAD:${BRANCH}" "$NEW_TAG"`,
+		`git tag "$TLS_TAG"`,
+		`git push "$AUTH_URL" "HEAD:${BRANCH}" "$NEW_TAG" "$TLS_TAG"`,
 		`echo "$NEW_TAG"`,
 	}, "\n")
 

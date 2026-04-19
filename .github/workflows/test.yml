@@ -12,49 +12,27 @@ permissions:
 
 jobs:
   test:
-    name: Test (${{ matrix.module }})
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - module: root
-            path: .
-          - module: fp-go-net-tls
-            path: ./fp-go-net-tls
-          - module: examples
-            path: ./examples
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
           cache: true
-
+      - run: go install gotest.tools/gotestsum@latest
       - name: Run tests
-        working-directory: ${{ matrix.path }}
         run: |
-          go test -v -json -count=1 ./... 2>&1 | tee /tmp/test-results-${{ matrix.module }}.json
-          exit ${PIPESTATUS[0]}
-
-      - name: Upload raw test output
+          rc=0
+          for mod in . fp-go-net-tls examples; do
+            (cd "$mod" && gotestsum --junitfile "$GITHUB_WORKSPACE/junit-$(basename $(pwd)).xml" -- -count=1 ./...) || rc=1
+          done
+          exit $rc
+      - uses: dorny/test-reporter@v1
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.module }}
-          path: /tmp/test-results-${{ matrix.module }}.json
-
-      - name: Report test results
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: "Test Results — ${{ matrix.module }}"
-          path: /tmp/test-results-${{ matrix.module }}.json
-          reporter: golang-json
+          name: Test Results
+          path: "junit-*.xml"
+          reporter: java-junit
           fail-on-error: true
           list-suites: all
           list-tests: all

@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    name: Test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: root
+            path: .
+          - module: fp-go-net-tls
+            path: ./fp-go-net-tls
+          - module: examples
+            path: ./examples
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Run tests
+        working-directory: ${{ matrix.path }}
+        run: |
+          go test -v -json -count=1 ./... 2>&1 | tee /tmp/test-results-${{ matrix.module }}.json
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload raw test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.module }}
+          path: /tmp/test-results-${{ matrix.module }}.json
+
+      - name: Report test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: "Test Results — ${{ matrix.module }}"
+          path: /tmp/test-results-${{ matrix.module }}.json
+          reporter: golang-json
+          fail-on-error: true
+          list-suites: all
+          list-tests: all
+          max-annotations: 50
+          only-summary: false

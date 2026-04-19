@@ -30,6 +30,8 @@ jobs:
       - uses: philip-peterson/publish-ci-results-action@v1
         if: always()
         with:
-          files: "junit-*.xml"
-          comment_mode: always
-          fail_on: test failures
+          report_paths: "junit-*.xml"
+          fail_on_failure: true
+          include_passed: true
+          detailed_summary: true
+          annotate_only: false

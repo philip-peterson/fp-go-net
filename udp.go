@@ -1,4 +1,4 @@
-package fpgonet
+package fp_go_net
 
 import (
 	"net"

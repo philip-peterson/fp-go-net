@@ -1,4 +1,4 @@
-package fpgonet
+package fp_go_net
 
 // Operation name constants used in NetError.Op to identify which network operation failed.
 const (

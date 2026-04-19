@@ -1,4 +1,4 @@
-package fpgonettls
+package fp_go_net_tls
 
 // Operation name constants used in NetError.Op for TLS handshake failures.
 const (

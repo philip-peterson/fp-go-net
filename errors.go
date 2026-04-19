@@ -1,7 +1,7 @@
-// Package fpgonet provides functional-programming-style wrappers around the
+// Package fp_go_net provides functional-programming-style wrappers around the
 // standard library's net package, exposing network operations as IOEither
 // values for principled, composable error handling.
-package fpgonet
+package fp_go_net
 
 // NetError wraps a network operation name and its underlying error.
 type NetError struct {

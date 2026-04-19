@@ -27,14 +27,9 @@ jobs:
             (cd "$mod" && gotestsum --junitfile "$GITHUB_WORKSPACE/junit-$(basename $(pwd)).xml" -- -count=1 ./...) || rc=1
           done
           exit $rc
-      - uses: dorny/test-reporter@v1
+      - uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          name: Test Results
-          path: "junit-*.xml"
-          reporter: java-junit
-          fail-on-error: true
-          list-suites: all
-          list-tests: all
-          max-annotations: 50
-          only-summary: false
+          files: "junit-*.xml"
+          comment_mode: always
+          fail_on: test failures

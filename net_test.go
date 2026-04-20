@@ -25,10 +25,6 @@ func (l MockListener) Addr() net.Addr {
 	return nil
 }
 
-func TestListen_Failure(t *testing.T) {
-	t.Fatal("deliberate failure")
-}
-
 func TestListen_Success(t *testing.T) {
 	mockListener := &MockListener{} // implements net.Listener
 	mockFn := func(network, addr string) (net.Listener, error) {

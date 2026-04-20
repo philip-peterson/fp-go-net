@@ -27,7 +27,7 @@ jobs:
             (cd "$mod" && gotestsum --junitfile "$GITHUB_WORKSPACE/junit-$(basename $(pwd)).xml" -- -count=1 ./...) || rc=1
           done
           exit $rc
-      - uses: philip-peterson/publish-ci-results-action@v1
+      - uses: philip-peterson/publish-ci-results-action@v1.1
         if: always()
         with:
           report_paths: "junit-*.xml"

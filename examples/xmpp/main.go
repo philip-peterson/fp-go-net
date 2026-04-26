@@ -63,6 +63,20 @@ type Message struct {
 	Body    string   `xml:"body"`
 }
 
+type Presence struct {
+	XMLName xml.Name `xml:"presence"`
+	Type    string   `xml:"type,attr,omitempty"`
+	To      string   `xml:"to,attr,omitempty"`
+	From    string   `xml:"from,attr,omitempty"`
+}
+
+type IQ struct {
+	XMLName  xml.Name `xml:"iq"`
+	Type     string   `xml:"type,attr"`
+	ID       string   `xml:"id,attr"`
+	InnerXML []byte   `xml:",innerxml"`
+}
+
 // Low-level helpers
 
 func wrapXMPP(op string) func(error) fpnet.NetError {
@@ -271,6 +285,79 @@ func routeMessage(ref ioref.IORef[ServerState], msg Message) {
 	)(fpnet.Write([]byte(payload))(toConn)())
 }
 
+func dispatchMessage(ref ioref.IORef[ServerState], jid JID) func(Message) Void {
+	return func(msg Message) Void {
+		log.Printf("[DEBUG] dispatchMessage: from=%q to=%q body=%q", jid, msg.To, msg.Body)
+		msg.From = jid
+		routeMessage(ref, msg)
+		return VOID
+	}
+}
+
+func dispatchPresence(s session, jid JID) func(Presence) Void {
+	return func(pres Presence) Void {
+		log.Printf("[DEBUG] dispatchPresence: type=%q from=%q", pres.Type, jid)
+		if pres.Type == "" {
+			writeVoid(s.conn, fmt.Sprintf(`<presence from='%s' to='%s'/>`, jid, jid))()
+		}
+		return VOID
+	}
+}
+
+func handlePresence(s session, jid JID, se xml.StartElement) Void {
+	return Pipe2(
+		decodeEl[Presence](s.dec, se)(),
+		E.Map[fpnet.NetError, Presence, Void](dispatchPresence(s, jid)),
+		E.GetOrElse(func(err fpnet.NetError) Void {
+			log.Printf("presence error from %s: %v (ignoring)", jid, err)
+			return VOID
+		}),
+	)
+}
+
+func dispatchIQ(s session, jid JID) func(IQ) Void {
+	return func(iq IQ) Void {
+		log.Printf("[DEBUG] dispatchIQ: type=%q id=%q from=%q body=%s", iq.Type, iq.ID, jid, iq.InnerXML)
+		if (iq.Type == "set" || iq.Type == "get") && iq.ID != "" {
+			body := string(iq.InnerXML)
+			var reply string
+			switch {
+			case strings.Contains(body, "disco#info"):
+				reply = fmt.Sprintf(
+					`<iq type='result' id='%s' from='%s' to='%s'>`+
+						`<query xmlns='http://jabber.org/protocol/disco#info'>`+
+						`<identity category='server' type='im' name='fp-go-net'/>`+
+						`<feature var='http://jabber.org/protocol/disco#info'/>`+
+						`<feature var='http://jabber.org/protocol/disco#items'/>`+
+						`</query></iq>`,
+					iq.ID, domain, jid,
+				)
+			case strings.Contains(body, "disco#items"):
+				reply = fmt.Sprintf(
+					`<iq type='result' id='%s' from='%s' to='%s'>`+
+						`<query xmlns='http://jabber.org/protocol/disco#items'/></iq>`,
+					iq.ID, domain, jid,
+				)
+			default:
+				reply = fmt.Sprintf(`<iq type='result' id='%s' from='%s' to='%s'/>`, iq.ID, domain, jid)
+			}
+			writeVoid(s.conn, reply)()
+		}
+		return VOID
+	}
+}
+
+func handleIQ(s session, jid JID, se xml.StartElement) Void {
+	return Pipe2(
+		decodeEl[IQ](s.dec, se)(),
+		E.Map[fpnet.NetError, IQ, Void](dispatchIQ(s, jid)),
+		E.GetOrElse(func(err fpnet.NetError) Void {
+			log.Printf("iq error from %s: %v (ignoring)", jid, err)
+			return VOID
+		}),
+	)
+}
+
 // stanzaLoop dispatches incoming stanzas until the connection closes,
 // then unregisters the session.
 func stanzaLoop(s session, ref ioref.IORef[ServerState], jid JID) IOE.IOEither[fpnet.NetError, Void] {
@@ -285,17 +372,18 @@ func stanzaLoop(s session, ref ioref.IORef[ServerState], jid JID) IOE.IOEither[f
 				func(se xml.StartElement) Void {
 					switch se.Name.Local {
 					case "message":
-						E.Fold(
-							func(err fpnet.NetError) Void {
+						Pipe2(
+							decodeEl[Message](s.dec, se)(),
+							E.Map[fpnet.NetError, Message, Void](dispatchMessage(ref, jid)),
+							E.GetOrElse(func(err fpnet.NetError) Void {
 								log.Printf("message error from %s: %v (ignoring)", jid, err)
 								return VOID
-							},
-							func(msg Message) Void {
-								msg.From = jid
-								routeMessage(ref, msg)
-								return VOID
-							},
-						)(decodeEl[Message](s.dec, se)())
+							}),
+						)
+					case "presence":
+						handlePresence(s, jid, se)
+					case "iq":
+						handleIQ(s, jid, se)
 					default:
 						s.dec.Skip()
 					}
